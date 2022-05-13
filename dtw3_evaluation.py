@@ -29,10 +29,6 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
         else:
             test_mfcc, test_wav, test_sfr, test_filename = tuple(zip(*test_data))[0]
 
-        if return_targets:
-            targ_text.append(test_text)
-            targ_speaker.append(test_speaker)
-
         mincost = np.inf
         minref_text = None
         minref_speaker = None
@@ -43,7 +39,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
                 # Do not compare with refrence recordings of the same speaker
                 continue
 
-            if not np.all(test_wav != ref_wav):
+            if test_filename != ref_filename:
                 distance = dtw(test_mfcc, ref_mfcc)
 
                 if distance < mincost:
@@ -51,18 +47,22 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
                     minref_text = ref_text
                     minref_speaker = ref_speaker
         
+        if return_targets:
+            targ_text.append(test_text)
+            targ_speaker.append(test_speaker)
         pred_text.append(minref_text)
         pred_speaker.append(minref_speaker)
 
         if verbose == True and i < 10:
             print(f'{i:3}/{len(test_dataloader)}: {pred_text[i]}')
     
-    if return_targets : return pred_text, pred_speaker, targ_text, targ_speaker
-    return pred_text, pred_speaker
+    if return_targets : return np.array(pred_text), np.array(pred_speaker), np.array(targ_text), np.array(targ_speaker)
+    return np.array(pred_text), np.array(pred_speaker)
 
 
 def wer(pred, targets):
-    v_err = np.zeros_like(pred)
+
+    v_err = np.zeros(len(pred))
     v_err[pred != targets] = 1
     err = np.sum(v_err)
 
@@ -86,12 +86,14 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
     # Free Spoken Digit Dataset
     free10x4x4_loader = DataLoader(free10x4x4_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     pred_text, pred_speaker, targ_text, targ_speaker = predict(free10x4x4_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
-    print(f'WER including reference recordings from the same speaker: {wer(pred_text, targ_text):.1f}%')
+    print(f'Text WER including reference recordings from the same speaker: {wer(pred_text, targ_text):.1f}%')
+    print(f'Speaker WER including reference recordings from the same speaker: {wer(pred_speaker, targ_speaker):.1f}%')
 
     # Google Speech Commands Dataset (small digit subset)
     commands10x100_loader = DataLoader(commands10x100_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     pred_text, pred_speaker, targ_text, targ_speaker = predict(commands10x100_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
-    print(f'WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
+    print(f'Text WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
+    print(f'Speaker WER using only reference recordings from other speakers: {wer(pred_speaker, targ_speaker):.1f}%')
 
     test_wavs_loader = DataLoader(test_wavs_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     test_ref_loader = DataLoader(ConcatDataset([commands10x10, commands10x100]), collate_fn=build_dtw_collate(), batch_size=1)
@@ -103,7 +105,7 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
         for i, command in enumerate(pred_text):
             entry = test_wavs_loader[i][2]
 
-            filename = entry['wav'].split('/')[-1].split('.')[0]
+            filename = entry.split('/')[-1].split('.')[0]
 
             print(f'{filename},{command}', file=f)
 
