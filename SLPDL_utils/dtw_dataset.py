@@ -32,8 +32,9 @@ class DTW_Dataset(Dataset):
 
 class DTW_MFCC_Dataset(Dataset):
     # This is half ugly, it allows to use GPU with only mfcc (less memory) but it is too complex
-    def __init__(self, dtw_dataset, mfsc_funct=None, return_wav=False):
+    def __init__(self, dtw_dataset, mfsc_funct=None, mfsc2mfcc_funct=None, return_wav=False):
         self.mfsc_funct = mfsc_funct or mfsc
+        self.mfsc2mfcc = mfsc2mfcc_funct or mfsc2mfcc
         self.dtw_dataset = dtw_dataset
         self.return_wav = return_wav
 
@@ -45,7 +46,7 @@ class DTW_MFCC_Dataset(Dataset):
         S = self.mfsc_funct(y, sfr)
 
         # Compute the mel spectrogram
-        M = mfsc2mfcc(S)
+        M = self.mfsc2mfcc(S)
         
         # Move the temporal dimension to the first index
         M = M.T
