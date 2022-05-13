@@ -43,7 +43,7 @@ def mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', norma
     highfreq = sfr/2
     
     # get window
-    window = get_window(win_length, type_=window)
+    window = get_windows(win_length, type_=window)
     padded_window = np.pad(window, (0, n_fft - win_length), mode='constant')[:, None]
     
     # preemphasis

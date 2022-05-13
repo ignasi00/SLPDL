@@ -1,4 +1,5 @@
 
+import numpy as np
 import pandas as pd
 import scipy.io.wavfile
 import torch
@@ -24,12 +25,13 @@ class DTW_Dataset(Dataset):
     def __getitem__(self, idx):
         rows = self.table_of_pathes.iloc[idx]
         sfr, wav = scipy.io.wavfile.read(rows[FILE])
-        return wav, sfr, *rows.to_list()[1:]
+        return wav, sfr, *rows.to_list()
     
     def __len__(self):
         return len(self.table_of_pathes.index)
 
 class DTW_MFCC_Dataset(Dataset):
+    # This is half ugly, it allows to use GPU with only mfcc (less memory) but it is too complex
     def __init__(self, dtw_dataset, mfsc_funct=None, return_wav=False):
         self.mfsc_funct = mfsc_funct or mfsc
         self.dtw_dataset = dtw_dataset
@@ -40,7 +42,7 @@ class DTW_MFCC_Dataset(Dataset):
         wav, sfr = data[:2]
 
         y = wav / 32768
-        S = self.mfsc(y, sfr)
+        S = self.mfsc_funct(y, sfr)
 
         # Compute the mel spectrogram
         M = mfsc2mfcc(S)
@@ -50,14 +52,15 @@ class DTW_MFCC_Dataset(Dataset):
         
         # DM = delta(M)
         # M = np.hstack((M, DM))
-        if self.return_wav : return M.astype(np.float32), wav, sfr, *data[2:]
+        if self.return_wav : return M.astype(np.float32), y, sfr, *data[2:]
         return M.astype(np.float32), sfr, *data[2:]
     
     def __len__(self):
         return len(self.dtw_dataset)
 
 
-def build_dtw_collate(torch=False, device=None, text_labels=None, speaker_labels=None):
+def build_dtw_collate(use_torch=False, device=None, text_labels=None, speaker_labels=None):
+    # This is ugly
     device = device or torch.device('cpu')
 
     def collate_fn(batch):
@@ -72,10 +75,10 @@ def build_dtw_collate(torch=False, device=None, text_labels=None, speaker_labels
         speaker_targets = []
         speaker = None
         for data in batch:
-            if   len(data) == 5 :   mfcc, wav, sfr, text, speaker = data
-            elif len(data) == 3 :   mfcc, wav, sfr                = data
-            elif len(data) == 2 :   wav, sfr                      = data
-            elif len(data) == 4 :   wav, sfr, text, speaker       = data
+            if   len(data) == 6 :   mfcc, wav, sfr, filename, text, speaker = data
+            elif len(data) == 4 :   mfcc, wav, sfr, filename                = data
+            elif len(data) == 3 :   wav, sfr, filename                      = data # This option works for both, "no mfcc & yes wav" and "no wav & yes mfcc"
+            elif len(data) == 5 :   wav, sfr, filename, text, speaker       = data
 
             try:
                 text_idx = text_labels.index(text)
@@ -98,7 +101,7 @@ def build_dtw_collate(torch=False, device=None, text_labels=None, speaker_labels
         sfr_list = torch.stack(sfr_list)
         sfr_list = sfr_list.to(device)
         
-        return_ = [inputs, sfr_list]
+        return_ = [inputs, sfr_list, filename]
 
         if text is not None:
             text_targets = torch.stack(text_targets)

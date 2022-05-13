@@ -1,5 +1,6 @@
 
 from numba import jit
+import numpy as np
 import scipy.linalg
 import scipy.spatial
 
