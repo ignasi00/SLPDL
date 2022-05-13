@@ -1,13 +1,15 @@
 
 # TODO: remake the list without random shuffling
 
+import numpy as np
 import torch
-from torch.utils.data import ConcatDataset
+from torch.utils.data import ConcatDataset, DataLoader
 
 import warnings
 from numba.core.errors import NumbaWarning
 warnings.simplefilter("ignore", category=NumbaWarning)
 
+from frameworks.scipy.dtw import dtw
 from SLPDL_utils.dtw_dataset import DTW_Dataset, DTW_MFCC_Dataset, build_dtw_collate
 
 
@@ -22,10 +24,10 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
     targ_text = []
     targ_speaker = []
     for i, test_data in enumerate(test_dataloader):
-        if same_spk == False or test_speaker == True:
-            test_mfcc, test_wav, test_sfr, test_filename, test_text, test_speaker = test_data
+        if same_spk == False or return_targets == True:
+            test_mfcc, test_wav, test_sfr, test_filename, test_text, test_speaker = tuple(zip(*test_data))[0]
         else:
-            test_mfcc, test_wav, test_sfr, test_filename = test_data
+            test_mfcc, test_wav, test_sfr, test_filename = tuple(zip(*test_data))[0]
 
         if return_targets:
             targ_text.append(test_text)
@@ -34,13 +36,14 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
         mincost = np.inf
         minref_text = None
         minref_speaker = None
-        for j, ref_mfcc, ref_wav, ref_sfr, ref_filename, ref_text, ref_speaker in enumerate(ref_dataloader):
+        for j, ref_data in enumerate(ref_dataloader):
+            ref_mfcc, ref_wav, ref_sfr, ref_filename, ref_text, ref_speaker = tuple(zip(*ref_data))[0]
 
             if not same_spk and test_speaker == ref_speaker:
                 # Do not compare with refrence recordings of the same speaker
                 continue
 
-            if test_wav != ref_wav:
+            if not np.all(test_wav != ref_wav):
                 distance = dtw(test_mfcc, ref_mfcc)
 
                 if distance < mincost:
@@ -75,10 +78,10 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
     free10x4x4 = DTW_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
     test_wavs = DTW_Dataset(test_wavs_list, data_root='', names=None, type_='test')
 
-    commands10x10_mfcc = DTW_MFCC_Dataset(commands10x10, mfsc_funct=None, return_wav=False)
-    commands10x100_mfcc = DTW_MFCC_Dataset(commands10x100, mfsc_funct=None, return_wav=False)
-    free10x4x4_mfcc = DTW_MFCC_Dataset(free10x4x4, mfsc_funct=None, return_wav=False)
-    test_wavs_mfcc = DTW_MFCC_Dataset(test_wavs, mfsc_funct=None, return_wav=False)
+    commands10x10_mfcc = DTW_MFCC_Dataset(commands10x10, mfsc_funct=None, return_wav=True)
+    commands10x100_mfcc = DTW_MFCC_Dataset(commands10x100, mfsc_funct=None, return_wav=True)
+    free10x4x4_mfcc = DTW_MFCC_Dataset(free10x4x4, mfsc_funct=None, return_wav=True)
+    test_wavs_mfcc = DTW_MFCC_Dataset(test_wavs, mfsc_funct=None, return_wav=True)
 
     # Free Spoken Digit Dataset
     free10x4x4_loader = DataLoader(free10x4x4_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
