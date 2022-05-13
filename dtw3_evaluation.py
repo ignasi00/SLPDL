@@ -11,7 +11,7 @@ warnings.simplefilter("ignore", category=NumbaWarning)
 
 from frameworks.scipy.dtw import dtw
 from frameworks.scipy.mfcc import mfsc, mfsc2mfcc
-from SLPDL_utils.dtw_dataset import DTW_Dataset, DTW_MFCC_Dataset, build_dtw_collate
+from SLPDL_utils.dtw_dataset import DTW_Dataset, DTW_MFCC_Dataset, build_dtw_collate, DTW_Memory_Dataset
 
 
 def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets=False, verbose=False):
@@ -74,10 +74,10 @@ def wer(pred, targets):
 
 def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list):
 
-    commands10x10 = DTW_Dataset(commands10x10_list, data_root='', names=None, type_='train')
-    commands10x100 = DTW_Dataset(commands10x100_list, data_root='', names=None, type_='train')
-    free10x4x4 = DTW_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
-    test_wavs = DTW_Dataset(test_wavs_list, data_root='', names=None, type_='test')
+    commands10x10 = DTW_Memory_Dataset(commands10x10_list, data_root='', names=None, type_='train')
+    commands10x100 = DTW_Memory_Dataset(commands10x100_list, data_root='', names=None, type_='train')
+    free10x4x4 = DTW_Memory_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
+    test_wavs = DTW_Memory_Dataset(test_wavs_list, data_root='', names=None, type_='test')
 
     mfsc_funct = lambda y, sfr : mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', normalize=False, log=True, n_mels=20, preemCoef=0, melfloor=1.0, n_fft=512)
     mfsc2mfcc_funct = lambda S : mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
