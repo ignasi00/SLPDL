@@ -67,7 +67,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
     return np.array(pred_text), np.array(pred_speaker), unknow_filename
 
 
-def wer(pred, targets):
+def error_rate(pred, targets):
 
     v_err = np.zeros(len(pred))
     v_err[pred != targets] = 1
@@ -80,33 +80,50 @@ def wer(pred, targets):
 
 def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list, output_path):
 
+    ######################################################################################
+    # Datasets that load audio
     commands10x10 = DTW_Dataset(commands10x10_list, data_root='', names=None, type_='train')
     commands10x100 = DTW_Dataset(commands10x100_list, data_root='', names=None, type_='train')
     free10x4x4 = DTW_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
     test_wavs = DTW_Dataset(test_wavs_list, data_root='', names=None, type_='test')
 
+    ######################
+    # The task about MFCC parameters and deltas can be done modifing this lines 
     mfsc_funct = lambda y, sfr : mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', normalize=False, log=True, n_mels=20, preemCoef=0, melfloor=1.0, n_fft=512)
     # TODO mfcc with deltas as def funct as mfsc2mfcc_funct
     mfsc2mfcc_funct = lambda S : mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
+    ######################
 
+    # Datasets that load MFCC and Audio
     commands10x10_mfcc = DTW_MFCC_Dataset(commands10x10, mfsc_funct=mfsc_funct, mfsc2mfcc_funct=mfsc2mfcc_funct, return_wav=True)
     commands10x100_mfcc = DTW_MFCC_Dataset(commands10x100, mfsc_funct=mfsc_funct, mfsc2mfcc_funct=mfsc2mfcc_funct, return_wav=True)
     free10x4x4_mfcc = DTW_MFCC_Dataset(free10x4x4, mfsc_funct=mfsc_funct, mfsc2mfcc_funct=mfsc2mfcc_funct, return_wav=True)
     test_wavs_mfcc = DTW_MFCC_Dataset(test_wavs, mfsc_funct=mfsc_funct, mfsc2mfcc_funct=mfsc2mfcc_funct, return_wav=True)
+    ######################################################################################
 
-    # Free Spoken Digit Dataset
+    ###########################################
+
+    ######################################################################################
+    # Free Spoken Digit Dataset - DTW evaluation
     free10x4x4_loader = DataLoader(free10x4x4_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(free10x4x4_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
-    print(f'Text WER including reference recordings from the same speaker: {wer(pred_text, targ_text):.1f}%')
-    print(f'Speaker WER including reference recordings from the same speaker: {wer(pred_speaker, targ_speaker):.1f}%')
 
-    # Google Speech Commands Dataset (small digit subset)
+    print(f'Text WER including reference recordings from the same speaker: {error_rate(pred_text, targ_text):.1f}%')
+    print(f'Speaker SER including reference recordings from the same speaker: {error_rate(pred_speaker, targ_speaker):.1f}%')
+    ######################################################################################
+
+    ######################################################################################
+    # Google Speech Commands Dataset (small digit subset) - DTW evaluation
     commands10x100_loader = DataLoader(commands10x100_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     commands10x10_loader = DataLoader(commands10x10_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(commands10x100_loader, ref_dataloader=commands10x10_loader, same_spk=False, return_targets=True, verbose=False)
-    print(f'Text WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
-    print(f'Speaker WER using only reference recordings from other speakers: {wer(pred_speaker, targ_speaker):.1f}%')
 
+    print(f'Text WER using only reference recordings from other speakers: {error_rate(pred_text, targ_text):.1f}%')
+    print(f'Speaker SER using only reference recordings from other speakers: {error_rate(pred_speaker, targ_speaker):.1f}%')
+    ######################################################################################
+
+    ######################################################################################
+    # Generating submission
     test_wavs_loader = DataLoader(test_wavs_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     test_ref_loader = DataLoader(ConcatDataset([commands10x10_mfcc, commands10x100_mfcc]), collate_fn=build_dtw_collate(), batch_size=1)
     pred_text, pred_speaker, unknow_filename = predict(test_wavs_loader, ref_dataloader=test_ref_loader, same_spk=True, return_targets=False, verbose=True)
@@ -118,7 +135,7 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
             filename = entry.split('/')[-1].split('.')[0]
 
             print(f'{filename},{command}', file=f)
-
+    ######################################################################################
 
 if __name__ == '__main__':
 
