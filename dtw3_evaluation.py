@@ -127,7 +127,7 @@ if __name__ == '__main__':
     test_wavs_list = './data_lists/test_wavs.csv'
 
     output_name = datetime.now().strftime(f"%Y%m%d%H%M%S_submission")
-    output_path = f'./dtw3/{output_name}.csv'
+    output_path = f'./outputs/dtw3/{output_name}.csv'
     pathlib.Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list, output_path)
