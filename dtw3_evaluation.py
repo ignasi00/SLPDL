@@ -1,7 +1,9 @@
 
 # TODO: remake the list without random shuffling
 
+from datetime import datetime
 import numpy as np
+import pathlib
 import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
@@ -26,6 +28,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
     pred_speaker = []
     targ_text = []
     targ_speaker = []
+    unknow_filename = []
     for i, test_data in enumerate(test_dataloader):
         if same_spk == False or return_targets == True:
             test_mfcc, test_wav, test_sfr, test_filename, test_text, test_speaker = tuple(zip(*test_data))[0]
@@ -55,12 +58,13 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
             targ_speaker.append(test_speaker)
         pred_text.append(minref_text)
         pred_speaker.append(minref_speaker)
+        unknow_filename.append(test_filename)
 
         if verbose == True and (i < 5 or (i % 50 == 0)):
             print(f'{i:3}/{len(test_dataloader)}: {pred_text[i]}')
     
-    if return_targets : return np.array(pred_text), np.array(pred_speaker), np.array(targ_text), np.array(targ_speaker)
-    return np.array(pred_text), np.array(pred_speaker)
+    if return_targets : return np.array(pred_text), np.array(pred_speaker), np.array(targ_text), np.array(targ_speaker), unknow_filename
+    return np.array(pred_text), np.array(pred_speaker), unknow_filename
 
 
 def wer(pred, targets):
@@ -74,7 +78,7 @@ def wer(pred, targets):
     return wer
 
 
-def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list):
+def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list, output_path):
 
     commands10x10 = DTW_Dataset(commands10x10_list, data_root='', names=None, type_='train')
     commands10x100 = DTW_Dataset(commands10x100_list, data_root='', names=None, type_='train')
@@ -92,26 +96,24 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
 
     # Free Spoken Digit Dataset
     free10x4x4_loader = DataLoader(free10x4x4_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker, targ_text, targ_speaker = predict(free10x4x4_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
+    pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(free10x4x4_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
     print(f'Text WER including reference recordings from the same speaker: {wer(pred_text, targ_text):.1f}%')
     print(f'Speaker WER including reference recordings from the same speaker: {wer(pred_speaker, targ_speaker):.1f}%')
 
     # Google Speech Commands Dataset (small digit subset)
     commands10x100_loader = DataLoader(commands10x100_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker, targ_text, targ_speaker = predict(commands10x100_loader, ref_dataloader=None, same_spk=False, return_targets=True, verbose=False)
+    pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(commands10x100_loader, ref_dataloader=None, same_spk=False, return_targets=True, verbose=False)
     print(f'Text WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
     print(f'Speaker WER using only reference recordings from other speakers: {wer(pred_speaker, targ_speaker):.1f}%')
 
     test_wavs_loader = DataLoader(test_wavs_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
     test_ref_loader = DataLoader(ConcatDataset([commands10x10_mfcc, commands10x100_mfcc]), collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker = predict(test_wavs_loader, ref_dataloader=test_ref_loader, same_spk=True, return_targets=False, verbose=True)
+    pred_text, pred_speaker, unknow_filename = predict(test_wavs_loader, ref_dataloader=test_ref_loader, same_spk=True, return_targets=False, verbose=True)
 
-    with open('submission.csv', 'w') as f:
+    with open(output_path, 'w') as f:
         print('filename,command', file=f)
 
-        for i, command in enumerate(pred_text):
-            entry = test_wavs_loader[i][2]
-
+        for command, entry in zip(pred_text, unknow_filename):
             filename = entry.split('/')[-1].split('.')[0]
 
             print(f'{filename},{command}', file=f)
@@ -124,4 +126,8 @@ if __name__ == '__main__':
     free10x4x4_list = './data_lists/free10x4x4.csv'
     test_wavs_list = './data_lists/test_wavs.csv'
 
-    main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list)
+    output_name = datetime.now().strftime(f"%Y%m%d%H%M%S_submission")
+    output_path = f'./dtw3/{output_name}.csv'
+    pathlib.Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list, output_path)
