@@ -2,6 +2,7 @@
 # TODO: remake the list without random shuffling
 
 from datetime import datetime
+import librosa
 import numpy as np
 import pathlib
 import torch
@@ -91,7 +92,12 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
     # The task about MFCC parameters and deltas can be done modifing this lines 
     mfsc_funct = lambda y, sfr : mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', normalize=False, log=True, n_mels=20, preemCoef=0, melfloor=1.0, n_fft=512)
     # TODO mfcc with deltas as def funct as mfsc2mfcc_funct
-    mfsc2mfcc_funct = lambda S : mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
+    # mfsc2mfcc_funct = lambda S : mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
+    def mfsc2mfcc_funct(S):
+        M = mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
+        DM = librosa.feature.delta(M)
+        M = np.hstack((M, DM))
+        return M
     ######################
 
     # Datasets that load MFCC and Audio
