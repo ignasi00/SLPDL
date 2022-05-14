@@ -30,22 +30,6 @@ class DTW_Dataset(Dataset):
     def __len__(self):
         return len(self.table_of_pathes.index)
 
-class DTW_Memory_Dataset(Dataset):
-
-    def __init__(self, list_path, data_root='', names=None, type_='train'):
-        names = names or (get_train_names() if type_ != 'test' else get_test_names())
-        self.table_of_pathes = pd.read_csv(list_path, header=None, index_col=False, names=names)
-        self.v_sfr, self.v_wav = tuple(zip(*[scipy.io.wavfile.read(rows[FILE]) for rows in self.table_of_pathes.to_dict(orient="records")]))
-
-    def __getitem__(self, idx):
-        rows = self.table_of_pathes.iloc[idx]
-        sfr = self.v_sfr[idx]
-        wav = self.v_wav[idx]
-        return wav, sfr, *rows.to_list()
-    
-    def __len__(self):
-        return len(self.table_of_pathes.index)
-
 class DTW_MFCC_Dataset(Dataset):
     # This is half ugly, it allows to use GPU with only mfcc (less memory) but it is too complex
     def __init__(self, dtw_dataset, mfsc_funct=None, mfsc2mfcc_funct=None, return_wav=False):
@@ -141,3 +125,44 @@ def build_dtw_collate(use_torch=False, device=None, text_labels=None, speaker_la
         return tuple(return_)
     
     return collate_fn
+
+
+class DTW_Memory_Dataset(Dataset):
+
+    def __init__(self, list_path, data_root='', names=None, type_='train'):
+        names = names or (get_train_names() if type_ != 'test' else get_test_names())
+
+        self.table_of_pathes = pd.read_csv(list_path, header=None, index_col=False, names=names)
+        self.v_sfr, self.v_wav = tuple(zip(*[scipy.io.wavfile.read(rows[FILE]) for rows in self.table_of_pathes.to_dict(orient="records")]))
+
+    def __getitem__(self, idx):
+        rows = self.table_of_pathes.iloc[idx]
+        sfr = self.v_sfr[idx]
+        wav = self.v_wav[idx]
+        return wav, sfr, *rows.to_list()
+    
+    def __len__(self):
+        return len(self.table_of_pathes.index)
+
+class DTW_Memory_MFCC_Dataset(Dataset):
+    # This is half ugly, it allows to use GPU with only mfcc (less memory) but it is too complex
+    def __init__(self, dtw_dataset, mfsc_funct=None, mfsc2mfcc_funct=None, return_wav=False):
+        mfsc_funct = mfsc_funct or mfsc
+        mfsc2mfcc = mfsc2mfcc_funct or mfsc2mfcc
+
+        self.dtw_dataset = dtw_dataset
+        self.return_wav = return_wav
+
+        self.v_M = [mfsc2mfcc(mfsc_funct(data[0] / 32768, data[1])).T for data in self.dtw_dataset]
+
+    def __getitem__(self, idx):
+        data = self.dtw_dataset[idx]
+        M = self.v_M[idx]
+        
+        # DM = delta(M)
+        # M = np.hstack((M, DM))
+        if self.return_wav : return M.astype(np.float32), *data
+        return M.astype(np.float32), *data[1:]
+    
+    def __len__(self):
+        return len(self.dtw_dataset)

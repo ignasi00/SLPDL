@@ -11,7 +11,9 @@ warnings.simplefilter("ignore", category=NumbaWarning)
 
 from frameworks.scipy.dtw import dtw
 from frameworks.scipy.mfcc import mfsc, mfsc2mfcc
-from SLPDL_utils.dtw_dataset import DTW_Dataset, DTW_MFCC_Dataset, build_dtw_collate, DTW_Memory_Dataset
+from SLPDL_utils.dtw_dataset import DTW_Memory_Dataset as DTW_Dataset
+from SLPDL_utils.dtw_dataset import DTW_Memory_MFCC_Dataset as DTW_MFCC_Dataset
+from SLPDL_utils.dtw_dataset import build_dtw_collate
 
 
 def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets=False, verbose=False):
@@ -36,7 +38,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
         for j, ref_data in enumerate(ref_dataloader):
             ref_mfcc, ref_wav, ref_sfr, ref_filename, ref_text, ref_speaker = tuple(zip(*ref_data))[0]
 
-            if not same_spk and test_speaker == ref_speaker:
+            if same_spk == False and test_speaker == ref_speaker:
                 # Do not compare with refrence recordings of the same speaker
                 continue
 
@@ -54,7 +56,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
         pred_text.append(minref_text)
         pred_speaker.append(minref_speaker)
 
-        if verbose == True and i < 10:
+        if verbose == True and (i < 5 or (i % 50 == 0)):
             print(f'{i:3}/{len(test_dataloader)}: {pred_text[i]}')
     
     if return_targets : return np.array(pred_text), np.array(pred_speaker), np.array(targ_text), np.array(targ_speaker)
@@ -74,12 +76,13 @@ def wer(pred, targets):
 
 def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_list):
 
-    commands10x10 = DTW_Memory_Dataset(commands10x10_list, data_root='', names=None, type_='train')
-    commands10x100 = DTW_Memory_Dataset(commands10x100_list, data_root='', names=None, type_='train')
-    free10x4x4 = DTW_Memory_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
-    test_wavs = DTW_Memory_Dataset(test_wavs_list, data_root='', names=None, type_='test')
+    commands10x10 = DTW_Dataset(commands10x10_list, data_root='', names=None, type_='train')
+    commands10x100 = DTW_Dataset(commands10x100_list, data_root='', names=None, type_='train')
+    free10x4x4 = DTW_Dataset(free10x4x4_list, data_root='', names=None, type_='train')
+    test_wavs = DTW_Dataset(test_wavs_list, data_root='', names=None, type_='test')
 
     mfsc_funct = lambda y, sfr : mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', normalize=False, log=True, n_mels=20, preemCoef=0, melfloor=1.0, n_fft=512)
+    # TODO mfcc with deltas as def funct as mfsc2mfcc_funct
     mfsc2mfcc_funct = lambda S : mfsc2mfcc(S, n_mfcc=12, dct_type=2, norm='ortho', lifter=22, cms=True, cmvn=True)
 
     commands10x10_mfcc = DTW_MFCC_Dataset(commands10x10, mfsc_funct=mfsc_funct, mfsc2mfcc_funct=mfsc2mfcc_funct, return_wav=True)
@@ -95,13 +98,13 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
 
     # Google Speech Commands Dataset (small digit subset)
     commands10x100_loader = DataLoader(commands10x100_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker, targ_text, targ_speaker = predict(commands10x100_loader, ref_dataloader=None, same_spk=True, return_targets=True, verbose=False)
+    pred_text, pred_speaker, targ_text, targ_speaker = predict(commands10x100_loader, ref_dataloader=None, same_spk=False, return_targets=True, verbose=False)
     print(f'Text WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
     print(f'Speaker WER using only reference recordings from other speakers: {wer(pred_speaker, targ_speaker):.1f}%')
 
     test_wavs_loader = DataLoader(test_wavs_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
-    test_ref_loader = DataLoader(ConcatDataset([commands10x10, commands10x100]), collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker = predict(test_wavs_loader, ref_dataloader=test_ref_loader, same_spk=False, return_targets=False, verbose=True)
+    test_ref_loader = DataLoader(ConcatDataset([commands10x10_mfcc, commands10x100_mfcc]), collate_fn=build_dtw_collate(), batch_size=1)
+    pred_text, pred_speaker = predict(test_wavs_loader, ref_dataloader=test_ref_loader, same_spk=True, return_targets=False, verbose=True)
 
     with open('submission.csv', 'w') as f:
         print('filename,command', file=f)
