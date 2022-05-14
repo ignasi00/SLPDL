@@ -47,7 +47,7 @@ def predict(test_dataloader, ref_dataloader=None, same_spk=False, return_targets
                 continue
 
             if test_filename != ref_filename:
-                distance = dtw(test_mfcc, ref_mfcc)
+                distance, _ = dtw(test_mfcc, ref_mfcc)
 
                 if distance < mincost:
                     mincost = distance

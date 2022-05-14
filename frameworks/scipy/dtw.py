@@ -28,7 +28,7 @@ def dtw(x, y, metric='sqeuclidean'):
       # D[i+1, j+1] = dist(x[i], y[j]) + min_prev
       D[i+1, j+1] += min_prev
 
-  '''
+
     if len(x) == 1:
         path = zeros(len(y)), range(len(y))
     elif len(y) == 1:
@@ -36,6 +36,23 @@ def dtw(x, y, metric='sqeuclidean'):
     else:
         path = _traceback(D)
     return D[-1, -1], path
-  '''
 
-  return D[-1, -1]
+def _traceback(D):
+    i, j = np.array(D.shape) - 2
+
+    path = [(i, j)]
+    
+    while (i > 0) or (j > 0):
+        tb = np.argmin((D[i, j], D[i, j + 1], D[i + 1, j]))
+
+        if tb == 0:
+            i -= 1
+            j -= 1
+        elif tb == 1:
+            i -= 1
+        else:  # (tb == 2):
+            j -= 1
+        
+        path.insert(0, (i, j))
+
+    return np.array(path)
