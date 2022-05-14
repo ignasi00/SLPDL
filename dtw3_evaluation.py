@@ -102,7 +102,8 @@ def main(commands10x10_list, commands10x100_list, free10x4x4_list, test_wavs_lis
 
     # Google Speech Commands Dataset (small digit subset)
     commands10x100_loader = DataLoader(commands10x100_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
-    pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(commands10x100_loader, ref_dataloader=None, same_spk=False, return_targets=True, verbose=False)
+    commands10x10_loader = DataLoader(commands10x10_mfcc, collate_fn=build_dtw_collate(), batch_size=1)
+    pred_text, pred_speaker, targ_text, targ_speaker, _ = predict(commands10x100_loader, ref_dataloader=commands10x10_loader, same_spk=False, return_targets=True, verbose=False)
     print(f'Text WER using only reference recordings from other speakers: {wer(pred_text, targ_text):.1f}%')
     print(f'Speaker WER using only reference recordings from other speakers: {wer(pred_speaker, targ_speaker):.1f}%')
 
@@ -126,7 +127,7 @@ if __name__ == '__main__':
     free10x4x4_list = './data_lists/free10x4x4.csv'
     test_wavs_list = './data_lists/test_wavs.csv'
 
-    output_name = datetime.now().strftime(f"%Y%m%d%H%M%S_submission")
+    output_name = datetime.now().strftime(f"%Y%m%d%H%M%S_submission") #TODO: idealmente en el main se genera el nombre con parametros asociados
     output_path = f'./outputs/dtw3/{output_name}.csv'
     pathlib.Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
