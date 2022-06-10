@@ -54,6 +54,7 @@ param_loader_vgg_params = SimpleNamespace(
 )
 
 param_loader_hubert_params = SimpleNamespace(
+    MODEL = "facebook/hubert-base-ls960",
     max_seconds = 10
 )
 
