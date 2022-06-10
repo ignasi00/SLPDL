@@ -197,6 +197,7 @@ def main(model_type):
     wandb_logger.summarize(vars(train_params))
     wandb_logger.summarize(vars(param_loader_params))
     wandb_logger.summarize(vars(model_params))
+    wandb_logger.summarize({'model_type' : model_type})
 
     t0 = time.time()
     while (epoch < train_params.epochs + 1) and (iteration < train_params.patience):
