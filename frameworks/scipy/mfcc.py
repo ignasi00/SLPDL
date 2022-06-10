@@ -44,7 +44,12 @@ def mfsc(y, sfr, window_size=0.025, window_stride=0.010, window='hamming', norma
     
     # get window
     window = get_windows(win_length, type_=window)
-    padded_window = np.pad(window, (0, n_fft - win_length), mode='constant')[:, None]
+    try:
+        padded_window = np.pad(window, (0, n_fft - win_length), mode='constant')[:, None]
+    except Exception as e:
+        if n_fft - win_length < 0:
+            raise Exception(f"Not enough n_fft points (currently: {n_fft})\nAt least it should be {win_length}")
+        raise e
     
     # preemphasis
     y = apply_preemphasis(y.copy(), preemCoef)

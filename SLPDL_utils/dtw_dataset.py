@@ -5,7 +5,6 @@ import scipy.io.wavfile
 import torch
 from torch.utils.data import Dataset
 
-from frameworks.pytorch.datasets.csv_dataset import CSV_Dataset
 from frameworks.scipy.mfcc import mfsc, mfsc2mfcc
 
 
@@ -61,7 +60,7 @@ class DTW_MFCC_Dataset(Dataset):
 
 
 def build_dtw_collate(use_torch=False, device=None, text_labels=None, speaker_labels=None):
-    # This is ugly
+    # All this function is ugly
     device = device or torch.device('cpu')
 
     def collate_fn(batch):
