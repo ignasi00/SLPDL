@@ -1,4 +1,5 @@
 # If this was a little serious, this code would have looked better
+# There is a kaggle version were the code works well, this fails in a lot of places
 
 from datetime import datetime
 import numpy as np
