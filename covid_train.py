@@ -204,7 +204,7 @@ def main(model_type):
     while (epoch < train_params.epochs + 1) and (iteration < train_params.patience):
 
         train_loss = train(train_loader, model, criterion, optimizer, epoch, train_params.cuda, train_params.log_interval)
-        valid_loss, valid_auc = test(valid_loader, model, criterion, train_params.cuda, data_set='Validation')
+        valid_loss, valid_auc = valid(valid_loader, model, criterion, train_params.cuda, data_set='Validation')
         
         wandb_logger.log({'epoch' : epoch, 'train_loss' : train_loss, 'valid_loss' : valid_loss, 'valid_auc' : valid_auc})
 
